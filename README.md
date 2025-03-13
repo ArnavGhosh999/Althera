@@ -1,4 +1,4 @@
-<h1><p align="justify">ALTHERA</p></h1>
+<h1><p align="center">ALTHERA</p></h1>
 
 <h2><p align="center">System Overview</p></h2>
 <p align="justify">ALTHERA is an AI-powered medicine recommendation system that uses text-based similarity search. It integrates <strong>TF-IDF</strong>, <strong>Vector Databases</strong>, and <strong>LLM APIs</strong> to enhance accuracy and efficiency.</p>
