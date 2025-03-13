@@ -68,27 +68,7 @@ class MedicalNLPModel:
         for keyword, condition in self.condition_mapping.items():
             if keyword in lower_query:
                 return condition, 'mapping'
-        try:
-            if self.query_table is not None:
-                query_embedding = self.extract_embedding(translated_query)
-                results = self.query_table.search(query_embedding).limit(1).to_pandas()
-                if not results.empty and 'condition' in results.columns:
-                    return results['condition'].iloc[0], 'vector'
-        except Exception as e:
-            print(f"Vector search error: {str(e)}")
         return translated_query, 'fallback'
-    
-    def search_similar_queries(self, query, n_results=3):
-        try:
-            if self.query_table is None:
-                return pd.DataFrame()
-            translated_query = self.translate_if_needed(query)
-            query_embedding = self.extract_embedding(translated_query)
-            results = self.query_table.search(query_embedding).limit(n_results).to_pandas()
-            return results
-        except Exception as e:
-            print(f"Error searching similar queries: {str(e)}")
-            return pd.DataFrame()
     
     def store_query(self, query, condition, recommendations):
         try:
@@ -122,6 +102,28 @@ class MedicineRecommendationSystem:
     def __init__(self, mistral_api_key=None):
         self.nlp_model = MedicalNLPModel()
         self.mistral_api_key = mistral_api_key or os.getenv("ALTHERA")
+        self.condition_use_mapping = {
+            "nausea": ["anti-nausea", "antiemetic"],
+            "vomiting": ["antiemetic", "anti-vomiting"],
+            "headache": ["pain relief", "analgesic", "headache"],
+            "migraine": ["migraine", "pain relief"],
+            "pain": ["pain relief", "analgesic"],
+            "fever": ["fever", "antipyretic"],
+            "cold": ["cold", "decongestant"],
+            "cough": ["cough", "antitussive"],
+            "sore throat": ["throat", "analgesic"],
+            "diarrhea": ["diarrhea", "antidiarrheal"],
+            "constipation": ["constipation", "laxative"],
+            "diabetes": ["diabetes", "antidiabetic"],
+            "hypertension": ["hypertension", "blood pressure"],
+            "insomnia": ["insomnia", "sleep"],
+            "allergies": ["allergy", "antihistamine"],
+            "common cold": ["cold", "decongestant"],
+            "influenza": ["flu", "antiviral"],
+            "allergic rhinitis": ["allergy", "antihistamine"],
+            "skin rash": ["rash", "antihistamine", "topical"],
+            "stomach pain": ["stomach", "antacid", "analgesic"]
+        }
     
     def query_mistral_llm(self, prompt):
         if not self.mistral_api_key:
@@ -150,10 +152,6 @@ class MedicineRecommendationSystem:
             return {"error": str(e)}
     
     def get_recommendations(self, query, from_medicines_df, from_ses_df):
-        similar_queries = self.nlp_model.search_similar_queries(query)
-        has_similar = len(similar_queries) > 0
-        if has_similar:
-            print(f"Found {len(similar_queries)} similar queries in database")
         condition, extraction_method = self.nlp_model.extract_condition(query)
         print(f"Extracted condition '{condition}' using {extraction_method} method")
         recommendations = self.get_medicines_for_condition(condition, from_medicines_df, from_ses_df)
@@ -163,32 +161,113 @@ class MedicineRecommendationSystem:
             'query': query,
             'condition': condition,
             'recommendations': recommendations,
-            'enhanced': enhanced_recommendations,
-            'had_similar_queries': has_similar
+            'enhanced': enhanced_recommendations
         }
     
     def get_medicines_for_condition(self, condition, medicines_df, ses_df):
-        condition_terms = condition.lower().split()
-        matched_medicines = []
+        use_keywords = self.condition_use_mapping.get(condition.lower(), [condition.lower()])
+        matched_medicines_by_ses = []
+        matched_medicines_by_comp = []
+        
+        for _, row in ses_df.iterrows():
+            medicine_name = row.get('medicine_name', '')
+            if not isinstance(medicine_name, str) or pd.isna(medicine_name):
+                continue
+                
+            matching_score = 0
+            use_cols = [col for col in row.index if col.startswith('use')]
+            
+            for col in use_cols:
+                if pd.isna(row[col]):
+                    continue
+                use_text = str(row[col]).lower()
+                for keyword in use_keywords:
+                    if keyword.lower() in use_text:
+                        matching_score += 1
+            
+            if matching_score > 0:
+                medicine_data = {'medicine': medicine_name, 'similarity_score': matching_score}
+                medicine_info = medicines_df[medicines_df['medicine_name'] == medicine_name]
+                
+                if not medicine_info.empty:
+                    medicine_data['price'] = medicine_info.iloc[0].get('price(₹)', 'N/A')
+                    medicine_data['manufacturer'] = medicine_info.iloc[0].get('manufacturer_name', 'N/A')
+                
+                matched_medicines_by_ses.append(medicine_data)
+        
         for _, row in medicines_df.iterrows():
-            medicine_name = row['medicine_name'] if 'medicine_name' in row else str(row.get('name', ''))
-            score = 0
-            med_text = f"{medicine_name} {row.get('short_composition1', '')} {row.get('short_composition2', '')}"
-            med_text = med_text.lower()
-            for term in condition_terms:
-                if term in med_text:
-                    score += 1
-            if score > 0:
-                matched_medicines.append({
+            medicine_name = row.get('medicine_name', '')
+            if not isinstance(medicine_name, str) or pd.isna(medicine_name):
+                continue
+                
+            comp1 = str(row.get('short_composition1', '')) if pd.notna(row.get('short_composition1', '')) else ''
+            comp2 = str(row.get('short_composition2', '')) if pd.notna(row.get('short_composition2', '')) else ''
+            
+            matching_score = 0
+            med_text = f"{medicine_name} {comp1} {comp2}".lower()
+            
+            for keyword in use_keywords:
+                if keyword.lower() in med_text:
+                    matching_score += 1
+            
+            if matching_score > 0:
+                matched_medicines_by_comp.append({
                     'medicine': medicine_name,
-                    'similarity_score': score / len(condition_terms),
+                    'similarity_score': matching_score,
                     'price': row.get('price(₹)', 'N/A'),
                     'manufacturer': row.get('manufacturer_name', 'N/A')
                 })
-        matched_medicines.sort(key=lambda x: x['similarity_score'], reverse=True)
-        for med in matched_medicines[:5]:
+        
+        all_matches = matched_medicines_by_ses + matched_medicines_by_comp
+        
+        if not all_matches:
+            print(f"No matches found for '{condition}', looking for generic medications")
+            if condition.lower() in ["headache", "pain", "fever"]:
+                generic_meds = ["Paracetamol", "Ibuprofen", "Aspirin"]
+            elif condition.lower() in ["nausea", "vomiting"]:
+                generic_meds = ["Ondansetron", "Domperidone", "Promethazine"]
+            elif condition.lower() in ["cold", "cough", "sore throat"]:
+                generic_meds = ["Cetirizine", "Dextromethorphan", "Loratadine"]
+            else:
+                generic_meds = []
+                
+            for med in generic_meds:
+                med_matches = medicines_df[medicines_df['medicine_name'].str.contains(med, case=False, na=False)]
+                if not med_matches.empty:
+                    for _, row in med_matches.iterrows():
+                        all_matches.append({
+                            'medicine': row.get('medicine_name', ''),
+                            'similarity_score': 0.5,
+                            'price': row.get('price(₹)', 'N/A'),
+                            'manufacturer': row.get('manufacturer_name', 'N/A')
+                        })
+        
+        unique_medicines = {}
+        for med in all_matches:
+            name = med['medicine']
+            if name not in unique_medicines or med['similarity_score'] > unique_medicines[name]['similarity_score']:
+                unique_medicines[name] = med
+        
+        final_matches = list(unique_medicines.values())
+        final_matches.sort(key=lambda x: x['similarity_score'], reverse=True)
+        
+        top_medicines = final_matches[:5] if final_matches else []
+        
+        if not top_medicines:
+            print("No condition-specific medicines found, returning general medications")
+            top_medicines = []
+            for i, row in medicines_df.head(5).iterrows():
+                top_medicines.append({
+                    'medicine': row.get('medicine_name', ''),
+                    'similarity_score': 0.1,
+                    'price': row.get('price(₹)', 'N/A'),
+                    'manufacturer': row.get('manufacturer_name', 'N/A')
+                })
+        
+        for med in top_medicines:
             self.add_ses_data(med, ses_df)
-        return matched_medicines[:5] if matched_medicines else []
+        
+        return top_medicines
     
     def add_ses_data(self, medicine_rec, ses_df):
         medicine_name = medicine_rec['medicine']
@@ -197,21 +276,20 @@ class MedicineRecommendationSystem:
             ses_data = matches.iloc[0]
             side_effects = []
             for col in ses_df.columns:
-                if col.startswith('sideEffect') and ses_data.get(col):
-                    if pd.notna(ses_data[col]):
-                        side_effects.append(str(ses_data[col]))
+                if col.startswith('sideEffect') and pd.notna(ses_data.get(col)) and ses_data.get(col) != '':
+                    side_effects.append(str(ses_data[col]))
             medicine_rec['side_effects'] = ', '.join(side_effects) if side_effects else 'No side effects listed'
+            
             substitutes = []
             for col in ses_df.columns:
-                if col.startswith('substitute') and ses_data.get(col):
-                    if pd.notna(ses_data[col]):
-                        substitutes.append(str(ses_data[col]))
+                if col.startswith('substitute') and pd.notna(ses_data.get(col)) and ses_data.get(col) != '':
+                    substitutes.append(str(ses_data[col]))
             medicine_rec['substitutes'] = ', '.join(substitutes) if substitutes else 'No substitutes listed'
+            
             uses = []
             for col in ses_df.columns:
-                if col.startswith('use') and ses_data.get(col):
-                    if pd.notna(ses_data[col]):
-                        uses.append(str(ses_data[col]))
+                if col.startswith('use') and pd.notna(ses_data.get(col)) and ses_data.get(col) != '':
+                    uses.append(str(ses_data[col]))
             medicine_rec['uses'] = ', '.join(uses) if uses else 'No uses listed'
         else:
             medicine_rec['side_effects'] = 'No side effects data available'
