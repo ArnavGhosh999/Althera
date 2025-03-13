@@ -8,6 +8,7 @@
 - LanceDB as the bases vector database, smart storing and retrieval of the queries.
 
 <h2>FUTURE MODIFICATIONS</h2>
+
 - Integration of a Retrieval Augmentated Generation (RAG) model using LangChain and LangGraph for smart context to context response.
 
 <img src = 'Readme Pics/LLM Architecture.jpg'>
