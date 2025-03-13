@@ -32,6 +32,8 @@ def main():
                 print(f"   Uses: {med['uses']}")
             if 'side_effects' in med:
                 print(f"   Side Effects: {med['side_effects']}")
+            if 'substitutes' in med:
+                print(f"   Substitutes: {med['substitutes']}")
         
         print("\nEnhanced recommendation:")
         print(result['enhanced'])
