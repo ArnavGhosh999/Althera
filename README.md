@@ -1,14 +1,3 @@
-<h1 align = "center">ALTHERA</h1>
-<p align="justify"> ALTHERA is an advanced AI system that utilizes the MISTRAL LLM to provide smart medicine recommendations and optimization. It is built using a combination of powerful technologies to ensure accurate, efficient, and intelligent suggestions. The system is trained on real medical data using a Mistral LLM backend, allowing it to understand complex queries. A Random Forest Classifier is used to identify common patterns in infections, medications, and allergies, helping to provide better treatment recommendations. Additionally, a BERT-based NLP model enhances the system's ability to process natural language queries, and with Google Translate API, it supports multilingual users worldwide. ALTHERA also uses LanceDB, a vector database that efficiently stores and retrieves medical queries, ensuring fast and relevant responses. With these technologies, ALTHERA aims to revolutionize medicine optimization through AI-driven insights.</h2>
-
-<h2>FUTURE MODIFICATIONS</h2>
-
-- Integration of a Retrieval Augmentated Generation (RAG) model using LangChain and LangGraph for smart context to context response.
-
-<img src = 'Readme Pics/LLM Architecture.jpg'>
-
-
-
 <h1><p align="center">ALTHERA</p></h1>
 
 <h2><p align="justify">System Overview</p></h2>
@@ -57,5 +46,17 @@
     <li><p align="justify"><strong>MISTRAL API:</strong> Uses a large language model for refining medicine suggestions.</p></li>
     <li><p align="justify"><strong>Format Responses:</strong> Returns a user-friendly structured response.</p></li>
 </ul>
+
+<img src = 'Readme Pics/LLM Architecture.jpg'>
+
+<h2>FUTURE MODIFICATIONS</h2>
+
+- Integration of a Retrieval Augmentated Generation (RAG) model using LangChain and LangGraph for smart context to context response.
+
+
+
+
+
+
 
 
