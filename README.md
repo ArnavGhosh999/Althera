@@ -32,8 +32,17 @@
 - Integration of a Retrieval Augmentated Generation (RAG) model using LangChain and LangGraph for smart context to context response.
 
 
+⚒️Setup and Installation
+1. Create a Python virtual environment.
+```
+python -m venv venv
+```
+2. Create a config file for storing the API keys.
+```
+config.env
+```
 
-
+Python --version : 3.11.0 or better.
 
 
 
