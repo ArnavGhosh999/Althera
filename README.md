@@ -1,7 +1,7 @@
 <h1><p align="center">ALTHERA</p></h1>
 
 <h2><p align="center">System Overview</p></h2>
-<p align="justify">ALTHERA is an AI-powered medicine recommendation system that uses text-based similarity search. It integrates <strong>TF-IDF</strong>, <strong>Vector Databases</strong>, and <strong>LLM APIs</strong> to enhance accuracy and efficiency.</p>
+<p align="justify">ALTHERA is an AI-powered medicine recommendation system that uses text-based similarity search to provide personalized medical recommendations. It integrates TF-IDF for keyword extraction, LanceDB as its vector database for efficient similarity search across massive medicine datasets, and the Mistral LLM to generate contextually appropriate recommendations. The system employs a Retrieval-Augmented Generation (RAG) architecture that first identifies relevant medications from the vector database based on user symptoms, then enhances these results with the LLM's medical knowledge to deliver personalized medication suggestions with appropriate dosage information, potential side effects, and alternatives.</p>
 
 <h2><p align="center">System Components</p></h2>
 
